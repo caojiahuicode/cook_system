@@ -101,11 +101,13 @@ nginx -v
 
 ## Ubuntu 从零部署步骤
 
+以下文档中的 `/home/user/cook-system` 只是示例路径，请按你的实际用户名和部署目录自行替换。
+
 ### 1. 拉取项目
 
 ```bash
-git clone <your-repo-url> /opt/cook-system
-cd /opt/cook-system
+git clone <your-repo-url> /home/user/cook-system
+cd /home/user/cook-system
 ```
 
 ### 2. 配置环境变量
@@ -203,7 +205,7 @@ sudo systemctl reload nginx
 
 ## 注意事项
 
-- 当前 `systemd` 模板默认项目路径为 `/opt/cook-system`
+- 当前文档与模板默认示例路径为 `/home/user/cook-system`
 - 当前 `systemd` 模板默认运行用户为 `www-data`
 - 当前 `systemd` 模板默认 `uv` 路径为 `/usr/local/bin/uv`
 - 如果你的部署路径或用户不同，请先修改模板中的 `WorkingDirectory`、`User`、`Group`
