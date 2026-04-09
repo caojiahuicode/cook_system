@@ -1,0 +1,34 @@
+[project]
+name = "cook-system"
+version = "0.1.0"
+description = "AI 厨神笔记 — 智能视频转菜谱系统"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Web 框架
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    # ORM
+    "tortoise-orm>=0.22.0",
+    "aiosqlite>=0.20.0",
+    # 异步任务队列
+    "taskiq>=0.11.0",
+    "taskiq-redis>=1.0.0",
+    # AI 推理
+    "dashscope>=1.24.6",
+    # 视频下载
+    "yt-dlp>=2024.12.0",
+    # 配置管理
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.0",
+    # 工具
+    "aiofiles>=24.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.backends"
+
+[tool.taskiq]
+broker = "backend.broker:broker"
+modules = ["backend.tasks"]

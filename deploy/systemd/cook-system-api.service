@@ -1,0 +1,17 @@
+[Unit]
+Description=Cook System FastAPI API
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/cook-system
+EnvironmentFile=/opt/cook-system/.env
+ExecStart=/usr/local/bin/uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
