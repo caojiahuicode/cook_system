@@ -8,9 +8,9 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     DASHSCOPE_API_KEY: str = ""
-    DASHSCOPE_MODEL: str = "qwen3.5-omni-plus-2026-03-15"
     DASHSCOPE_BASE_URL: str = "https://dashscope.aliyuncs.com/api/v1"
-    DASHSCOPE_VIDEO_FPS: float = 2.0
+    DASHSCOPE_MODEL: str = "qwen3.5-omni-plus"
+    DASHSCOPE_TIMEOUT_SECONDS: int = 180
 
     BASE_DIR: Path = Path(__file__).resolve().parent.parent
     TEMP_DIR: Path = BASE_DIR / "temp"
@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     SCREENSHOTS_DIR: Path = STATIC_DIR / "screenshots"
 
     FFMPEG_PATH: str = "ffmpeg"
+    YTDLP_PATH: str = ".venv/bin/yt-dlp"
+    YTDLP_COOKIES_FILE: str | None = None
+    YTDLP_COOKIES_FROM_BROWSER: str | None = None
     VIDEO_WIDTH: int = 1280
     VIDEO_HEIGHT: int = 720
     VIDEO_FPS: int = 30

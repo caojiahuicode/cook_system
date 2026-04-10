@@ -110,7 +110,6 @@ onMounted(async () => {
           </div>
           <ul class="grid grid-cols-2 gap-4">
             <li v-for="tool in recipe.tools" :key="tool.name" class="bg-surface-container-lowest p-4 rounded-md flex flex-col gap-2">
-              <span class="material-symbols-outlined text-secondary-container">{{ tool.icon }}</span>
               <span class="font-medium">{{ tool.name }}</span>
             </li>
           </ul>

@@ -7,10 +7,12 @@ import shutil
 from pathlib import Path
 
 from backend.broker import broker
-from backend.config import settings
+from backend.config import TORTOISE_ORM, settings
 from backend.models import Recipe, RecipeStatus
 from backend.utils.dashscope_client import analyze_cooking_video
 from backend.utils.video import download_video, extract_frame, transcode_to_720p
+from tortoise import Tortoise
+from tortoise.exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,15 @@ async def _update_recipe(recipe_id: int, **kwargs) -> None:
     await Recipe.filter(id=recipe_id).update(**kwargs)
 
 
+async def _ensure_orm_ready() -> None:
+    try:
+        _ = Recipe._meta.db
+    except ConfigurationError:
+        logger.info("Worker ORM 未初始化，正在补做 Tortoise 初始化")
+        await Tortoise.init(config=TORTOISE_ORM)
+        await Tortoise.generate_schemas()
+
+
 @broker.task
 async def process_cooking_video(recipe_id: int, url: str) -> None:
     """
@@ -35,6 +46,8 @@ async def process_cooking_video(recipe_id: int, url: str) -> None:
     4. ffmpeg 关键帧截图
     5. 资源清理
     """
+    await _ensure_orm_ready()
+
     task_temp_dir = settings.TEMP_DIR / str(recipe_id)
     task_temp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -68,7 +81,7 @@ async def process_cooking_video(recipe_id: int, url: str) -> None:
         await _update_recipe(
             recipe_id,
             status=RecipeStatus.ANALYZING,
-            status_text="AI 正在分析烹饪内容...",
+            status_text="Omni 正在分析转码视频...",
             progress=55,
         )
         recipe_data = await analyze_cooking_video(transcoded_path)
@@ -133,11 +146,14 @@ async def process_cooking_video(recipe_id: int, url: str) -> None:
 
     except Exception as exc:
         logger.exception("[%d] 任务失败", recipe_id)
+        error_message = str(exc)
+        if "Omni" in error_message or "DashScope" in error_message:
+            error_message = f"Omni 分析失败: {error_message}"
         await _update_recipe(
             recipe_id,
             status=RecipeStatus.FAILED,
             status_text="处理失败",
-            error_message=str(exc),
+            error_message=error_message,
         )
     finally:
         # ── 资源清理: 删除 temp 下的原始与中间文件 ──

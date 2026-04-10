@@ -1,4 +1,4 @@
-"""DashScope 官方 SDK 集成 — 视频上传与 AI 推理"""
+"""DashScope SDK 驱动的 Omni 非实时视频分析客户端"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 import dashscope
@@ -49,10 +50,16 @@ COOKING_ANALYSIS_PROMPT = """\
 5. 如果无法确定某个字段，请合理推断，不要留空"""
 
 
-def _build_file_uri(video_path: Path) -> str:
-    """构造 DashScope SDK 可接受的本地文件 URI"""
-    absolute = video_path.resolve()
-    return absolute.as_uri()
+@dataclass(slots=True)
+class OmniAnalysisRequest:
+    video_path: Path
+    prompt: str
+
+
+@dataclass(slots=True)
+class OmniAnalysisResult:
+    raw_text: str
+    parsed_json: dict
 
 
 def _extract_json(text: str) -> dict:
@@ -76,52 +83,77 @@ def _extract_json(text: str) -> dict:
     return data
 
 
-async def analyze_cooking_video(video_path: Path) -> dict:
-    """
-    将标准 MP4 上传至 DashScope 临时存储并调用多模态模型分析。
+def _build_file_uri(video_path: Path) -> str:
+    return video_path.resolve().as_uri()
 
-    返回解析后的菜谱 JSON dict。
-    """
-    dashscope.base_http_api_url = settings.DASHSCOPE_BASE_URL
 
-    file_uri = _build_file_uri(video_path)
-    logger.info("DashScope 推理请求 — 模型: %s, 视频: %s", settings.DASHSCOPE_MODEL, file_uri)
-
-    messages = [
+def _build_messages(request: OmniAnalysisRequest) -> list[dict]:
+    return [
         {
             "role": "user",
             "content": [
-                {"video": file_uri, "fps": settings.DASHSCOPE_VIDEO_FPS},
-                {"text": COOKING_ANALYSIS_PROMPT},
+                {
+                    "video": _build_file_uri(request.video_path),
+                },
+                {"text": request.prompt},
             ],
         }
     ]
 
-    response = await asyncio.to_thread(
-        MultiModalConversation.call,
+
+def _extract_response_text(response) -> str:
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"DashScope 请求失败 (status={response.status_code}, code={response.code}): {response.message}"
+        )
+
+    output = response.output
+    choices = getattr(output, "choices", None) or []
+    if not choices:
+        raise ValueError("DashScope 返回缺少 choices")
+
+    message = choices[0].message
+    content = getattr(message, "content", None) or []
+    if not content:
+        raise ValueError("DashScope 返回缺少 message.content")
+
+    first_item = content[0]
+    text = first_item.get("text") if isinstance(first_item, dict) else None
+    if not text or not text.strip():
+        raise ValueError("DashScope 未返回可解析文本")
+
+    return text.strip()
+
+
+def _analyze_with_dashscope_sdk(request: OmniAnalysisRequest) -> OmniAnalysisResult:
+    dashscope.base_http_api_url = settings.DASHSCOPE_BASE_URL
+    messages = _build_messages(request)
+
+    logger.info("DashScope SDK 请求 — 模型: %s, 视频: %s", settings.DASHSCOPE_MODEL, request.video_path)
+    response = MultiModalConversation.call(
         api_key=settings.DASHSCOPE_API_KEY,
         model=settings.DASHSCOPE_MODEL,
         messages=messages,
+        timeout=settings.DASHSCOPE_TIMEOUT_SECONDS,
+    )
+    raw_text = _extract_response_text(response)
+    return OmniAnalysisResult(
+        raw_text=raw_text,
+        parsed_json=_extract_json(raw_text),
     )
 
-    if response.status_code != 200:
-        raise RuntimeError(
-            f"DashScope API 调用失败 (code={response.status_code}): "
-            f"{getattr(response, 'message', 'unknown error')}"
-        )
 
-    content_list = response.output.choices[0].message.content
-    raw_text = ""
-    for item in content_list:
-        if isinstance(item, dict) and "text" in item:
-            raw_text = item["text"]
-            break
-        elif isinstance(item, str):
-            raw_text = item
-            break
+async def analyze_cooking_video(video_path: Path) -> dict:
+    """
+    将本地转码视频按 dashscope SDK 契约作为本地文件传入，由 SDK 自动上传后
+    通过非实时 Omni 接口分析。
 
-    if not raw_text:
-        raise ValueError("DashScope 返回内容为空")
-
-    logger.info("DashScope 原始响应 (前200字): %s", raw_text[:200])
-    return _extract_json(raw_text)
+    返回解析后的菜谱 JSON dict。
+    """
+    request = OmniAnalysisRequest(
+        video_path=video_path,
+        prompt=COOKING_ANALYSIS_PROMPT,
+    )
+    result = await asyncio.to_thread(_analyze_with_dashscope_sdk, request)
+    logger.info("DashScope SDK 原始响应 (前200字): %s", result.raw_text[:200])
+    return result.parsed_json

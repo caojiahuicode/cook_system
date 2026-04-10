@@ -15,7 +15,6 @@ dependencies = [
     "taskiq>=0.11.0",
     "taskiq-redis>=1.0.0",
     # AI 推理
-    "dashscope>=1.24.6",
     # 视频下载
     "yt-dlp>=2024.12.0",
     # 配置管理
@@ -23,12 +22,16 @@ dependencies = [
     "python-dotenv>=1.0.0",
     # 工具
     "aiofiles>=24.1.0",
+    "dashscope>=1.25.16",
 ]
 
 [build-system]
 requires = ["hatchling"]
-build-backend = "hatchling.backends"
+build-backend = "hatchling.build"
 
 [tool.taskiq]
 broker = "backend.broker:broker"
 modules = ["backend.tasks"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]

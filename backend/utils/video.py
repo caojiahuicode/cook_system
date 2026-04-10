@@ -17,13 +17,22 @@ async def download_video(url: str, output_dir: Path) -> Path:
     output_template = str(output_dir / "%(title).80s.%(ext)s")
 
     cmd = [
-        "yt-dlp",
+        settings.YTDLP_PATH,
         "--no-playlist",
         "--no-overwrites",
         "-o", output_template,
         "--print", "after_move:filepath",
-        url,
     ]
+
+    if settings.YTDLP_COOKIES_FILE:
+        cmd.extend(["--cookies", settings.YTDLP_COOKIES_FILE])
+        logger.info("yt-dlp 将使用 cookies 文件")
+    elif settings.YTDLP_COOKIES_FROM_BROWSER:
+        cmd.extend(["--cookies-from-browser", settings.YTDLP_COOKIES_FROM_BROWSER])
+        logger.info("yt-dlp 将从浏览器读取 cookies: %s", settings.YTDLP_COOKIES_FROM_BROWSER)
+
+    cmd.append(url)
+
     logger.info("yt-dlp 开始下载: %s", url)
     proc = await asyncio.create_subprocess_exec(
         *cmd,
